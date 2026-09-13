@@ -64,7 +64,6 @@ def pad_to_constraints(
 
     C, T, H, W = x_cthw.shape
 
-    # 空域对齐（16 倍数）
     new_H = ((H + spatial_multiple - 1) // spatial_multiple) * spatial_multiple
     new_W = ((W + spatial_multiple - 1) // spatial_multiple) * spatial_multiple
     pad_top = (new_H - H) // 2
@@ -78,16 +77,13 @@ def pad_to_constraints(
                 x_cthw, (pad_left, pad_right, pad_top, pad_bottom), mode="reflect"
             )
         except Exception:
-            # 当尺寸过小时 reflect 可能失败，回退到 replicate
             x_cthw = F.pad(
                 x_cthw, (pad_left, pad_right, pad_top, pad_bottom), mode="replicate"
             )
 
-    # 时域对齐（4N+1）
     target_T = 1 + ((T - 1 + temporal_group - 1) // temporal_group) * temporal_group
     pad_T = target_T - T
     if pad_T > 0:
-        # 用最后一帧复制补齐，避免引入不存在的运动
         x_cthw = F.pad(x_cthw, (0, 0, 0, 0, 0, pad_T), mode="replicate")
 
     crop_info = {
@@ -149,7 +145,6 @@ def restore_one_video_cthw(
     # VAE encode
     lq_latent = torch.stack(vae.encode(lq_bcthw))           # [B,Cz,T',H',W']
 
-    # 采样噪声 latent
     latent_shape = (
         vae.model.z_dim,
         latent_length,
@@ -157,7 +152,6 @@ def restore_one_video_cthw(
         W // vae_stride[2],
     )
 
-    # token length 对齐
     H_ = latent_shape[2]
     W_ = latent_shape[3]
     spatial_tokens = (H_ // patch_size[1]) * (W_ // patch_size[2])
@@ -221,7 +215,6 @@ def run_inference_on_video(
     C, T, H, W = lq_cthw.shape
     print(f"[INFO] Original video: T={T}, H={H}, W={W}, fps={input_fps:.2f}")
 
-    # 健壮性检查与提示
     if H % 16 != 0 or W % 16 != 0:
         print(
             f"[WARN] Resolution {H}x{W} is not a multiple of 16; "
@@ -264,11 +257,11 @@ def run_inference_on_video(
 
 def main():
     parser = argparse.ArgumentParser(description="DTI single-video inference")
-    parser.add_argument("--input", "-i", required=True, help="输入低质量视频路径")
-    parser.add_argument("--output", "-o", required=True, help="输出修复后视频路径")
+    parser.add_argument("--input", "-i", required=True, help="input path")
+    parser.add_argument("--output", "-o", required=True, help="output path")
     parser.add_argument("--sampling_steps", type=int, default=50)
     parser.add_argument("--shift", type=float, default=5.0)
-    parser.add_argument("--fps", type=int, default=6, help="输出 fps，默认使用输入视频 fps")
+    parser.add_argument("--fps", type=int, default=6, help="fps")
     parser.add_argument("--seed", type=int, default=2025)
     args = parser.parse_args()
 
