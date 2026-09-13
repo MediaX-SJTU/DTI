@@ -95,7 +95,6 @@ def pad_to_constraints(
     target_T = 1 + ((T - 1 + temporal_group - 1) // temporal_group) * temporal_group
     pad_T = target_T - T
     if pad_T > 0:
-        # 用最后一帧复制补齐，避免引入不存在的运动
         x_cthw = F.pad(x_cthw, (0, 0, 0, 0, 0, pad_T), mode="replicate")
 
     crop_info = {
@@ -274,7 +273,6 @@ def run_inference_on_video(
     C, T, H, W = lq_cthw.shape
     print(f"[INFO] Original video: T={T}, H={H}, W={W}, fps={input_fps:.2f}")
 
-    # 健壮性检查
     if H % 16 != 0 or W % 16 != 0:
         print(
             f"[WARN] Resolution {H}x{W} is not a multiple of 16; "
@@ -315,18 +313,17 @@ def run_inference_on_video(
 
 def main():
     parser = argparse.ArgumentParser(description="DP + DiT single-video inference")
-    parser.add_argument("--input", "-i", required=True, help="输入低质量视频路径")
-    parser.add_argument("--output", "-o", required=True, help="输出修复后视频路径")
-    parser.add_argument("--perception_ratio", "-p", type=float, default=0.5, help="DP 动态预测感知比例")
+    parser.add_argument("--input", "-i", required=True, help="input path")
+    parser.add_argument("--output", "-o", required=True, help="output path")
+    parser.add_argument("--perception_ratio", "-p", type=float, default=0.5, help="DP ratio")
     parser.add_argument("--sampling_steps", type=int, default=50)
     parser.add_argument("--shift", type=float, default=5.0)
-    parser.add_argument("--fps", type=int, default=6, help="输出 fps，默认使用输入视频 fps")
-    parser.add_argument("--seed", type=int, default=-1, help="随机种子，-1 表示随机")
+    parser.add_argument("--fps", type=int, default=6, help="fps")
+    parser.add_argument("--seed", type=int, default=-1, help="seed")
     args = parser.parse_args()
 
     device = torch.device("cuda")
 
-    # 加载模型
     c_null = torch.load("../Exposition/context_null.pt").to("cpu")
     print("success load c_null")
 
